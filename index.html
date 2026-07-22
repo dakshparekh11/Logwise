@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Logwise</title>
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#db4c3f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Logwise">
 <style>
   :root{
     --red:#db4c3f;
@@ -174,6 +180,8 @@
   .main{flex:1;display:flex;flex-direction:column;min-width:0;background:var(--panel-bg);}
   .main-scroll{flex:1;overflow-y:auto;}
   .main-inner{max-width:800px;margin:0 auto;padding:36px 40px 120px 40px;}
+  .main-inner.view-fading{opacity:0;transform:translateY(4px);}
+  .main-inner{transition:opacity .16s ease, transform .16s ease;}
 
   .view-header{margin-bottom:4px;}
   .view-title{font-size:26px;font-weight:700;display:flex;align-items:center;gap:10px;}
@@ -633,6 +641,7 @@
     <input type="password" id="authPassword" placeholder="Password" autocomplete="current-password">
     <button class="btn-primary" id="authSignInBtn">Sign In</button>
     <button class="btn-link" id="authToggleModeBtn">New here? Create an account instead</button>
+    <button class="btn-link" id="authForgotBtn" style="margin-top:-4px;font-size:12.5px;">Forgot password?</button>
     <div class="auth-error" id="authError"></div>
   </div>
 </div>
@@ -640,6 +649,9 @@
 </head>
 <body>
 <div class="app" id="app" style="display:none;">
+  <div id="offlineBanner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:5000;background:#3a3a3a;color:#fff;text-align:center;font-size:12.5px;padding:6px 10px;">
+    📴 You're offline — changes are saved on this device and will sync once you're back online.
+  </div>
 
   <!-- SIDEBAR -->
   <nav class="sidebar" id="sidebar">
@@ -685,6 +697,9 @@
     <div class="nav-item" data-view="studylog">
       <span class="nav-icon">📊</span> Study Log
     </div>
+    <div class="nav-item" data-view="insights">
+      <span class="nav-icon">📈</span> Insights
+    </div>
     <div class="nav-item" data-view="completed">
       <span class="nav-icon">✅</span> Completed
     </div>
@@ -726,6 +741,7 @@
         <input type="file" id="importFileInput" accept="application/json,.json" style="display:none;">
         <div id="backupStatusText" style="font-size:11px;color:var(--text-tertiary);line-height:1.4;"></div>
         <div style="border-top:1px solid var(--border);margin-top:6px;padding-top:8px;">
+          <div id="syncAccountText" style="font-size:11px;color:var(--text-tertiary);line-height:1.4;margin-bottom:2px;"></div>
           <div id="syncStatusText" style="font-size:11px;color:var(--text-tertiary);line-height:1.4;">☁️ Checking sync…</div>
           <button class="btn btn-secondary btn-sm" id="signOutBtn" style="margin-top:6px;width:100%;">Sign out</button>
         </div>
@@ -1588,6 +1604,7 @@ function renderViewHeader(){
   else if(ui.view==="journal"){ title = "📓 Journal"; }
   else if(ui.view==="syllabus"){ title = "📖 Syllabus Completion"; sub = "Subject → Module → Topic, just like your tracker sheet"; }
   else if(ui.view==="studylog"){ title = "📊 Study Log"; sub = "Mock exams & practice test scores"; }
+  else if(ui.view==="insights"){ title = "📈 Insights"; sub = "Your progress at a glance"; }
   else if(ui.view==="completed"){ title = "✅ Completed"; }
   else if(ui.view==="project"){
     const p = getProject(ui.selectedProjectId);
@@ -1649,7 +1666,7 @@ function wireContextFilter(){
 --------------------------------------------------------------- */
 function renderQuickAdd(){
   const area = document.getElementById("quickAddArea");
-  const skipViews = ["completed","search","home","habits","journal","studylog","syllabus"];
+  const skipViews = ["completed","search","home","habits","journal","studylog","syllabus","insights"];
   if(skipViews.includes(state.ui.view)){ area.innerHTML=""; return; }
   area.innerHTML = `<div class="quick-add-row" id="openQuickAdd">
     <span class="plus-circle-outline">+</span> Add task
@@ -2169,6 +2186,81 @@ function emptyStateHtml(big, small){
 }
 
 /* ---------------------------------------------------------------
+   INSIGHTS VIEW (added)
+--------------------------------------------------------------- */
+function renderInsightsHtml(){
+  const stats = weekRangeStats();
+  const sStreak = studyStreak();
+  const overallSyl = state.syllabus.length ? overallSyllabusCompletion() : null;
+
+  // 30-day study trend
+  const last30 = [];
+  for(let i=29;i>=0;i--){
+    const d = addDays(todayISO(), -i);
+    last30.push({date:d, seconds: state.studyLog[d] || 0});
+  }
+  const max30 = Math.max(1, ...last30.map(d=>d.seconds));
+  const total30 = last30.reduce((s,d)=>s+d.seconds, 0);
+
+  // All-time totals
+  const totalTasksCompletedEver = state.tasks.filter(t=>t.completed).length;
+  const totalStudySecondsEver = Object.values(state.studyLog).reduce((s,v)=>s+v, 0);
+
+  // Habit streaks
+  const habitRows = [...state.habits].sort((a,b)=>a.order-b.order).map(h=>{
+    const streak = habitStreak(h);
+    return `<div class="journal-activity-row"><span>${h.type==="avoid"?"🚫":"🔥"} ${escapeHtml(h.name)}</span><b>${streak} day${streak===1?"":"s"}</b></div>`;
+  }).join("");
+
+  // Recent mock exam scores
+  const recentExams = [...state.mockExams].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,8);
+
+  return `
+  <div class="dash-grid">
+    <div class="dash-card">
+      <h4>All-time tasks completed</h4>
+      <div class="dash-stat">${totalTasksCompletedEver}</div>
+    </div>
+    <div class="dash-card">
+      <h4>All-time study time</h4>
+      <div class="dash-stat">${fmtHMS(totalStudySecondsEver)}</div>
+    </div>
+    <div class="dash-card">
+      <h4>Study streak</h4>
+      <div class="dash-stat">🔥 ${sStreak}</div>
+      <div class="dash-stat-label">consecutive day${sStreak===1?"":"s"}</div>
+    </div>
+    ${overallSyl!==null ? `
+    <div class="dash-card">
+      <h4>Syllabus completion</h4>
+      <div class="dash-stat">${overallSyl}%</div>
+    </div>` : ""}
+    <div class="dash-card dash-full">
+      <h4>Study time — last 30 days (${fmtHMS(total30)} total)</h4>
+      <div class="bar-chart">
+        ${last30.map(d=>{
+          const h = Math.round((d.seconds/max30)*90)+2;
+          return `<div class="bar-chart-col">
+            <div class="bar-chart-bar" style="height:${h}px;" title="${d.date}: ${fmtHMS(d.seconds)}"></div>
+          </div>`;
+        }).join("")}
+      </div>
+    </div>
+    <div class="dash-card dash-full">
+      <h4>Habit streaks</h4>
+      ${habitRows ? `<div class="journal-activity">${habitRows}</div>` : emptyStateHtml("No habits yet", "Add habits to see streaks here.")}
+    </div>
+    <div class="dash-card dash-full">
+      <h4>Recent mock exam scores</h4>
+      ${recentExams.length ? `<div class="journal-activity">${recentExams.map(e=>{
+        const pct = Math.round((e.score/e.maxScore)*100);
+        return `<div class="journal-activity-row"><span>${escapeHtml(e.topic)} · ${e.date}</span><b>${e.score}/${e.maxScore} (${pct}%)</b></div>`;
+      }).join("")}</div>` : emptyStateHtml("No mock exams logged yet", "Log scores from the Study Log view to see trends here.")}
+    </div>
+  </div>`;
+}
+
+/* ---------------------------------------------------------------
    MAIN TASK LIST AREA RENDER (per view)
 --------------------------------------------------------------- */
 function renderTaskListArea(){
@@ -2180,6 +2272,7 @@ function renderTaskListArea(){
   if(ui.view==="journal"){ area.innerHTML = renderJournalHtml(); return; }
   if(ui.view==="syllabus"){ area.innerHTML = renderSyllabusHtml(); return; }
   if(ui.view==="studylog"){ area.innerHTML = renderStudyLogHtml(); return; }
+  if(ui.view==="insights"){ area.innerHTML = renderInsightsHtml(); return; }
 
   const tasks = currentTaskSet();
 
@@ -2345,10 +2438,15 @@ function renderHabitsHtml(){
     </div>`;
   }
 
+  if(state.habits.length === 0){
+    return `
+      <div style="margin-bottom:14px;"><button class="btn btn-primary btn-sm" id="addHabitBtn">+ Add habit</button></div>
+      ${emptyStateHtml("🔥 No habits yet", "Track things you want to build (like studying daily) or avoid (like late-night phone use). Add your first one above.")}`;
+  }
   return `
     <div style="margin-bottom:14px;"><button class="btn btn-primary btn-sm" id="addHabitBtn">+ Add habit</button></div>
     <div class="habit-section-title">Build (${build.length})</div>
-    ${build.length ? build.map(habitBlock).join("") : '<div style="color:var(--text-tertiary);font-size:13px;">No habits yet.</div>'}
+    ${build.length ? build.map(habitBlock).join("") : '<div style="color:var(--text-tertiary);font-size:13px;">No "build" habits yet.</div>'}
     <div class="habit-section-title">Avoid (${avoid.length})</div>
     ${avoid.length ? avoid.map(habitBlock).join("") : '<div style="color:var(--text-tertiary);font-size:13px;">No "avoid" habits yet — e.g. "No sugar."</div>'}
   `;
@@ -3200,7 +3298,7 @@ function renderCmdkResults(query){
   const views = [
     {id:"home",name:"Home",icon:"🏠"},{id:"inbox",name:"Inbox",icon:"📥"},{id:"today",name:"Today",icon:"📅"},
     {id:"upcoming",name:"Upcoming",icon:"🗓️"},{id:"habits",name:"Habits",icon:"🔥"},{id:"journal",name:"Journal",icon:"📓"},
-    {id:"syllabus",name:"Syllabus",icon:"📖"},{id:"studylog",name:"Study Log",icon:"📊"},{id:"completed",name:"Completed",icon:"✅"}
+    {id:"syllabus",name:"Syllabus",icon:"📖"},{id:"studylog",name:"Study Log",icon:"📊"},{id:"insights",name:"Insights",icon:"📈"},{id:"completed",name:"Completed",icon:"✅"}
   ];
   views.forEach(v=>{
     if(!q || v.name.toLowerCase().includes(q)){
@@ -3270,9 +3368,15 @@ function handleGlobalKeydown(e){
   if(isTypingContext(e)) return;
   if(anyOverlayOpen()) return;
 
+  if(e.key==="/"){
+    e.preventDefault();
+    document.getElementById("searchInput").focus();
+    return;
+  }
+
   if(e.key==="q" || e.key==="Q"){
     e.preventDefault();
-    const skip = ["completed","search","home","habits","journal","studylog","syllabus"];
+    const skip = ["completed","search","home","habits","journal","studylog","syllabus","insights"];
     if(skip.includes(state.ui.view)){ state.ui.view = "inbox"; renderAll(); }
     openQuickAddForm();
     return;
@@ -3410,16 +3514,18 @@ function renderFocusMode(){
 function wireStaticEvents(){
   document.querySelectorAll(".nav-item").forEach(el=>{
     el.addEventListener("click", ()=>{
-      state.ui.view = el.dataset.view;
-      closeTaskDetail();
-      resetKeyboardFocus();
-      renderAll();
+      switchViewWithFade(()=>{
+        state.ui.view = el.dataset.view;
+        closeTaskDetail();
+        resetKeyboardFocus();
+        renderAll();
+      });
       document.getElementById("sidebar").classList.remove("open");
     });
   });
 
   document.getElementById("sidebarAddTask").addEventListener("click", ()=>{
-    const skip = ["completed","search","home","habits","journal","studylog","syllabus"];
+    const skip = ["completed","search","home","habits","journal","studylog","syllabus","insights"];
     if(skip.includes(state.ui.view)) state.ui.view = "inbox";
     renderAll();
     openQuickAddForm();
@@ -3584,11 +3690,18 @@ function wireDynamicEvents(){
   document.querySelectorAll('[data-action="delete-habit"]').forEach(el=>{
     el.addEventListener("click", e=>{
       e.stopPropagation();
-      if(confirm("Delete this habit? Its history will be lost.")){
-        state.habits = state.habits.filter(h=>h.id!==el.dataset.id);
+      const id = el.dataset.id;
+      const idx = state.habits.findIndex(h=>h.id===id);
+      if(idx===-1) return;
+      const removed = state.habits[idx];
+      state.habits.splice(idx,1);
+      save();
+      renderAll();
+      showSnackbar("Habit deleted", "Undo", ()=>{
+        state.habits.splice(idx, 0, removed);
         save();
         renderAll();
-      }
+      });
     });
   });
 
@@ -3739,6 +3852,15 @@ function renderAll(){
   wireDynamicEvents();
   renderDetailPanel();
 }
+function switchViewWithFade(applyFn){
+  const el = document.querySelector(".main-inner");
+  if(!el){ applyFn(); return; }
+  el.classList.add("view-fading");
+  setTimeout(()=>{
+    applyFn();
+    requestAnimationFrame(()=> el.classList.remove("view-fading"));
+  }, 90);
+}
 
 /* ---------------------------------------------------------------
    INIT
@@ -3788,13 +3910,22 @@ function updateSyncStatusUI(text){
   if(el) el.textContent = text;
 }
 
+function updateOfflineBannerUI(){
+  const banner = document.getElementById("offlineBanner");
+  if(!banner) return;
+  banner.style.display = navigator.onLine ? "none" : "block";
+  if(!navigator.onLine) updateSyncStatusUI("📴 Offline — will sync when reconnected");
+}
+window.addEventListener("online", ()=>{ updateOfflineBannerUI(); if(currentUid) scheduleCloudSync(); });
+window.addEventListener("offline", updateOfflineBannerUI);
+
 function scheduleCloudSync(){
   if(!currentUid || applyingRemoteChange) return;
   clearTimeout(syncWriteTimer);
   updateSyncStatusUI("☁️ Syncing…");
   syncWriteTimer = setTimeout(()=>{
     stateDocRef(currentUid).set({ data: JSON.stringify(state), updatedAt: Date.now() })
-      .then(()=> updateSyncStatusUI("☁️ Synced just now"))
+      .then(()=> updateSyncStatusUI("☁️ Synced · " + new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"})))
       .catch(e=>{ console.error("Cloud sync write failed", e); updateSyncStatusUI("⚠️ Sync failed — check connection"); });
   }, 1200);
 }
@@ -3802,12 +3933,14 @@ function scheduleCloudSync(){
 function startCloudSync(uid){
   currentUid = uid;
   updateSyncStatusUI("☁️ Connecting…");
+  const acctEl = document.getElementById("syncAccountText");
+  if(acctEl) acctEl.textContent = "Signed in as " + (auth.currentUser ? auth.currentUser.email : "");
   if(syncUnsubscribe) syncUnsubscribe();
   syncUnsubscribe = stateDocRef(uid).onSnapshot((doc)=>{
     if(!doc.exists){
       // First device ever signed into this account: push local data up as the baseline.
       stateDocRef(uid).set({ data: JSON.stringify(state), updatedAt: Date.now() });
-      updateSyncStatusUI("☁️ Synced");
+      updateSyncStatusUI("☁️ Synced · " + new Date().toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}));
       return;
     }
     const remote = doc.data();
@@ -3818,7 +3951,8 @@ function startCloudSync(uid){
     idbSet(DB_KEY, state).catch(e=>console.error(e));
     renderAll();
     applyingRemoteChange = false;
-    updateSyncStatusUI("☁️ Synced");
+    const t = remote.updatedAt ? new Date(remote.updatedAt) : new Date();
+    updateSyncStatusUI("☁️ Synced · " + t.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}));
   }, (err)=>{
     console.error("Cloud sync listener error", err);
     updateSyncStatusUI("⚠️ Sync error — check connection");
@@ -3834,6 +3968,7 @@ function stopCloudSync(){
 function showApp(){
   document.getElementById("authOverlay").style.display = "none";
   document.getElementById("app").style.display = "";
+  updateOfflineBannerUI();
 }
 function showAuthOverlay(){
   document.getElementById("authOverlay").style.display = "flex";
@@ -3862,6 +3997,20 @@ document.getElementById("authSignInBtn").addEventListener("click", async ()=>{
     }
   }catch(e){
     errEl.textContent = e.message || "Something went wrong.";
+  }
+});
+
+document.getElementById("authForgotBtn").addEventListener("click", async ()=>{
+  const email = document.getElementById("authEmail").value.trim();
+  const errEl = document.getElementById("authError");
+  errEl.style.color = "#c9382c";
+  if(!email){ errEl.textContent = "Enter your email above first, then click this link."; return; }
+  try{
+    await auth.sendPasswordResetEmail(email);
+    errEl.style.color = "#1a7f37";
+    errEl.textContent = "Reset email sent — check your inbox.";
+  }catch(e){
+    errEl.textContent = e.message || "Couldn't send reset email.";
   }
 });
 
