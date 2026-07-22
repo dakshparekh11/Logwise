@@ -1228,20 +1228,22 @@ function scheduleFileBackup(){
 }
 
 async function writeBackupFile(){
-  if(!backupFileHandle) return;
+  if(!backupFileHandle) return false;
   try{
     let perm = await backupFileHandle.queryPermission({mode:"readwrite"});
     if(perm !== "granted"){
       perm = await backupFileHandle.requestPermission({mode:"readwrite"});
     }
-    if(perm !== "granted"){ updateBackupStatusUI("reconnect-needed"); return; }
+    if(perm !== "granted"){ updateBackupStatusUI("reconnect-needed"); return false; }
     const writable = await backupFileHandle.createWritable();
     await writable.write(JSON.stringify(state, null, 2));
     await writable.close();
     updateBackupStatusUI("connected");
+    return true;
   }catch(e){
     console.error("Direct file backup write failed", e);
     updateBackupStatusUI("error");
+    return false;
   }
 }
 
@@ -1311,7 +1313,11 @@ async function handleConnectBackupClick(){
   if(backupFileHandle){
     try{
       const perm = await backupFileHandle.requestPermission({mode:"readwrite"});
-      if(perm === "granted"){ await writeBackupFile(); return; }
+      if(perm === "granted"){
+        const ok = await writeBackupFile();
+        if(ok) return; // write actually succeeded — no need to re-pick the file
+        // write failed (file moved/deleted/locked) — fall through to the picker below
+      }
     }catch(e){ /* handle may be stale — fall through to picking a file again */ }
   }
   await connectBackupFile();
