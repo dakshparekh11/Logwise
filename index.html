@@ -1912,22 +1912,58 @@ function createArea(name, color){
 }
 function deleteProject(id){
   const toRemove = [id, ...descendantProjectIds(id)];
+  const removedProjects = state.projects.filter(p=>toRemove.includes(p.id));
+  const affectedTasks = state.tasks.filter(t=>toRemove.includes(t.projectId)).map(t=>({id:t.id, projectId:t.projectId}));
   state.projects = state.projects.filter(p=>!toRemove.includes(p.id));
   state.tasks.forEach(t=>{ if(toRemove.includes(t.projectId)) t.projectId=null; });
   if(state.ui.view==="project" && toRemove.includes(state.ui.selectedProjectId)){ state.ui.view="inbox"; }
   save();
+  return {removedProjects, affectedTasks};
+}
+function undoDeleteProject(snapshot){
+  state.projects.push(...snapshot.removedProjects);
+  snapshot.affectedTasks.forEach(a=>{
+    const t = state.tasks.find(x=>x.id===a.id);
+    if(t) t.projectId = a.projectId;
+  });
+  save();
+  renderAll();
 }
 function deleteLabel(id){
+  const removedLabel = getLabel(id);
+  const affectedTasks = state.tasks.filter(t=>t.labelIds && t.labelIds.includes(id)).map(t=>({id:t.id, labelIds:[...t.labelIds]}));
   state.labels = state.labels.filter(l=>l.id!==id);
   state.tasks.forEach(t=>{ if(t.labelIds) t.labelIds = t.labelIds.filter(lid=>lid!==id); });
   if(state.ui.view==="label" && state.ui.selectedLabelId===id){ state.ui.view="inbox"; }
   save();
+  return {removedLabel, affectedTasks};
+}
+function undoDeleteLabel(snapshot){
+  if(snapshot.removedLabel) state.labels.push(snapshot.removedLabel);
+  snapshot.affectedTasks.forEach(a=>{
+    const t = state.tasks.find(x=>x.id===a.id);
+    if(t) t.labelIds = a.labelIds;
+  });
+  save();
+  renderAll();
 }
 function deleteArea(id){
+  const removedArea = getArea(id);
+  const affectedTasks = state.tasks.filter(t=>t.areaIds && t.areaIds.includes(id)).map(t=>({id:t.id, areaIds:[...t.areaIds]}));
   state.areas = state.areas.filter(a=>a.id!==id);
   state.tasks.forEach(t=>{ if(t.areaIds) t.areaIds = t.areaIds.filter(aid=>aid!==id); });
   if(state.ui.view==="area" && state.ui.selectedAreaId===id){ state.ui.view="inbox"; }
   save();
+  return {removedArea, affectedTasks};
+}
+function undoDeleteArea(snapshot){
+  if(snapshot.removedArea) state.areas.push(snapshot.removedArea);
+  snapshot.affectedTasks.forEach(a=>{
+    const t = state.tasks.find(x=>x.id===a.id);
+    if(t) t.areaIds = a.areaIds;
+  });
+  save();
+  renderAll();
 }
 
 /* ---------------------------------------------------------------
@@ -3653,7 +3689,14 @@ function wireDynamicEvents(){
     btn.addEventListener("click", e=>{ e.stopPropagation(); openProjectModal(getProject(btn.dataset.id)); });
   });
   document.querySelectorAll('[data-action="delete-project"]').forEach(btn=>{
-    btn.addEventListener("click", e=>{ e.stopPropagation(); if(confirm("Delete this project (and any sub-projects)? Tasks will move to Inbox.")){ deleteProject(btn.dataset.id); renderAll(); } });
+    btn.addEventListener("click", e=>{
+      e.stopPropagation();
+      const proj = getProject(btn.dataset.id);
+      const name = proj ? proj.name : "Project";
+      const snapshot = deleteProject(btn.dataset.id);
+      renderAll();
+      showSnackbar(`"${name}" deleted`, "Undo", ()=> undoDeleteProject(snapshot));
+    });
   });
 
   document.querySelectorAll(".label-item").forEach(el=>{
@@ -3671,7 +3714,14 @@ function wireDynamicEvents(){
     btn.addEventListener("click", e=>{ e.stopPropagation(); openLabelModal(getLabel(btn.dataset.id)); });
   });
   document.querySelectorAll('[data-action="delete-label"]').forEach(btn=>{
-    btn.addEventListener("click", e=>{ e.stopPropagation(); if(confirm("Delete this label?")){ deleteLabel(btn.dataset.id); renderAll(); } });
+    btn.addEventListener("click", e=>{
+      e.stopPropagation();
+      const lbl = getLabel(btn.dataset.id);
+      const name = lbl ? lbl.name : "Label";
+      const snapshot = deleteLabel(btn.dataset.id);
+      renderAll();
+      showSnackbar(`"${name}" deleted`, "Undo", ()=> undoDeleteLabel(snapshot));
+    });
   });
 
   document.querySelectorAll(".area-item").forEach(el=>{
@@ -3689,7 +3739,14 @@ function wireDynamicEvents(){
     btn.addEventListener("click", e=>{ e.stopPropagation(); openAreaModal(getArea(btn.dataset.id)); });
   });
   document.querySelectorAll('[data-action="delete-area"]').forEach(btn=>{
-    btn.addEventListener("click", e=>{ e.stopPropagation(); if(confirm("Delete this area?")){ deleteArea(btn.dataset.id); renderAll(); } });
+    btn.addEventListener("click", e=>{
+      e.stopPropagation();
+      const ar = getArea(btn.dataset.id);
+      const name = ar ? ar.name : "Area";
+      const snapshot = deleteArea(btn.dataset.id);
+      renderAll();
+      showSnackbar(`"${name}" deleted`, "Undo", ()=> undoDeleteArea(snapshot));
+    });
   });
 
   const openBtn = document.getElementById("openQuickAdd");
@@ -4093,6 +4150,17 @@ auth.onAuthStateChanged(async (user)=>{
     showAuthOverlay();
   }
 });
+
+/* ---------------------------------------------------------------
+   OFFLINE APP-SHELL CACHING (added)
+   Lets the app still open (sign-in screen or last-loaded state)
+   with no internet connection, e.g. no signal on a train.
+--------------------------------------------------------------- */
+if("serviceWorker" in navigator){
+  window.addEventListener("load", ()=>{
+    navigator.serviceWorker.register("service-worker.js").catch(e=>console.error("Service worker registration failed", e));
+  });
+}
 
 })();
 </script>
