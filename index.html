@@ -757,20 +757,20 @@
       <div id="projectList"></div>
     </div>
 
+        <div class="sidebar-section">
+      <div class="sidebar-section-header">
+        <span>Areas of life</span>
+        <span class="add-inline" id="addAreaBtn" title="Add area">+</span>
+      </div>
+      <div id="areaList"></div>
+    </div>
+
     <div class="sidebar-section">
       <div class="sidebar-section-header">
         <span>Labels</span>
         <span class="add-inline" id="addLabelBtn" title="Add label">+</span>
       </div>
       <div id="labelList"></div>
-    </div>
-
-    <div class="sidebar-section">
-      <div class="sidebar-section-header">
-        <span>Areas of life</span>
-        <span class="add-inline" id="addAreaBtn" title="Add area">+</span>
-      </div>
-      <div id="areaList"></div>
     </div>
 
     <div class="sidebar-section" style="margin-top:18px;padding-top:10px;border-top:1px solid var(--border);">
@@ -2022,43 +2022,6 @@ function openProjectModal(existing){
   nameInput.addEventListener("keydown", e=>{ if(e.key==="Enter") document.getElementById("modalSave").click(); if(e.key==="Escape") closeModal(); });
 }
 
-function openLabelModal(existing){
-  const root = document.getElementById("modalRoot");
-  let selectedColor = existing ? existing.color : LABEL_COLORS[0];
-  root.innerHTML = `<div class="modal-backdrop" id="modalBackdrop">
-    <div class="modal">
-      <h3>${existing?"Edit label":"Add label"}</h3>
-      <input type="text" id="modalNameInput" placeholder="Label name" value="${existing?escapeHtml(existing.name):""}">
-      <div class="swatches" id="modalSwatches">
-        ${LABEL_COLORS.map(c=>`<span class="swatch ${c===selectedColor?'selected':''}" style="background:${c}" data-color="${c}"></span>`).join("")}
-      </div>
-      <div class="modal-actions">
-        <button class="btn btn-secondary" id="modalCancel">Cancel</button>
-        <button class="btn btn-primary" id="modalSave">${existing?"Save":"Add"}</button>
-      </div>
-    </div>
-  </div>`;
-  const nameInput = document.getElementById("modalNameInput");
-  nameInput.focus();
-  document.getElementById("modalSwatches").addEventListener("click", e=>{
-    const sw = e.target.closest(".swatch");
-    if(!sw) return;
-    selectedColor = sw.dataset.color;
-    document.querySelectorAll("#modalSwatches .swatch").forEach(s=>s.classList.toggle("selected", s===sw));
-  });
-  document.getElementById("modalCancel").onclick = closeModal;
-  document.getElementById("modalBackdrop").addEventListener("click", e=>{ if(e.target.id==="modalBackdrop") closeModal(); });
-  document.getElementById("modalSave").onclick = ()=>{
-    const name = nameInput.value.trim();
-    if(!name) return;
-    if(existing){ existing.name = name; existing.color = selectedColor; save(); }
-    else { const l = createLabel(name, selectedColor); state.ui.view="label"; state.ui.selectedLabelId=l.id; }
-    closeModal();
-    renderAll();
-  };
-  nameInput.addEventListener("keydown", e=>{ if(e.key==="Enter") document.getElementById("modalSave").click(); if(e.key==="Escape") closeModal(); });
-}
-
 function openAreaModal(existing){
   const root = document.getElementById("modalRoot");
   let selectedColor = existing ? existing.color : AREA_COLORS[0];
@@ -2090,6 +2053,43 @@ function openAreaModal(existing){
     if(!name) return;
     if(existing){ existing.name = name; existing.color = selectedColor; save(); }
     else { const a = createArea(name, selectedColor); state.ui.view="area"; state.ui.selectedAreaId=a.id; }
+    closeModal();
+    renderAll();
+  };
+  nameInput.addEventListener("keydown", e=>{ if(e.key==="Enter") document.getElementById("modalSave").click(); if(e.key==="Escape") closeModal(); });
+}
+
+function openLabelModal(existing){
+  const root = document.getElementById("modalRoot");
+  let selectedColor = existing ? existing.color : LABEL_COLORS[0];
+  root.innerHTML = `<div class="modal-backdrop" id="modalBackdrop">
+    <div class="modal">
+      <h3>${existing?"Edit label":"Add label"}</h3>
+      <input type="text" id="modalNameInput" placeholder="Label name" value="${existing?escapeHtml(existing.name):""}">
+      <div class="swatches" id="modalSwatches">
+        ${LABEL_COLORS.map(c=>`<span class="swatch ${c===selectedColor?'selected':''}" style="background:${c}" data-color="${c}"></span>`).join("")}
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="modalCancel">Cancel</button>
+        <button class="btn btn-primary" id="modalSave">${existing?"Save":"Add"}</button>
+      </div>
+    </div>
+  </div>`;
+  const nameInput = document.getElementById("modalNameInput");
+  nameInput.focus();
+  document.getElementById("modalSwatches").addEventListener("click", e=>{
+    const sw = e.target.closest(".swatch");
+    if(!sw) return;
+    selectedColor = sw.dataset.color;
+    document.querySelectorAll("#modalSwatches .swatch").forEach(s=>s.classList.toggle("selected", s===sw));
+  });
+  document.getElementById("modalCancel").onclick = closeModal;
+  document.getElementById("modalBackdrop").addEventListener("click", e=>{ if(e.target.id==="modalBackdrop") closeModal(); });
+  document.getElementById("modalSave").onclick = ()=>{
+    const name = nameInput.value.trim();
+    if(!name) return;
+    if(existing){ existing.name = name; existing.color = selectedColor; save(); }
+    else { const l = createLabel(name, selectedColor); state.ui.view="label"; state.ui.selectedLabelId=l.id; }
     closeModal();
     renderAll();
   };
@@ -2965,15 +2965,15 @@ function renderDetailPanel(){
           <option value="">None</option>
           ${CONTEXTS.map(c=>`<option value="${c.id}" ${t.context===c.id?"selected":""}>${c.icon} ${c.name}</option>`).join("")}
         </select>
+        
+        <label>Areas of life</label>
+        <div class="label-toggle-list" id="detailAreas">
+          ${state.areas.map(a=>`<span class="label-toggle ${(t.areaIds||[]).includes(a.id)?'selected':''}" data-area-id="${a.id}"><span class="color-dot" style="background:${a.color}"></span>${escapeHtml(a.name)}</span>`).join("") || '<span style="color:var(--text-tertiary);font-size:12px;">No areas yet</span>'}
+        </div>
 
         <label>Labels</label>
         <div class="label-toggle-list" id="detailLabels">
           ${state.labels.map(l=>`<span class="label-toggle ${(t.labelIds||[]).includes(l.id)?'selected':''}" data-label-id="${l.id}"><span class="color-dot" style="background:${l.color}"></span>${escapeHtml(l.name)}</span>`).join("") || '<span style="color:var(--text-tertiary);font-size:12px;">No labels yet</span>'}
-        </div>
-
-        <label>Areas of life</label>
-        <div class="label-toggle-list" id="detailAreas">
-          ${state.areas.map(a=>`<span class="label-toggle ${(t.areaIds||[]).includes(a.id)?'selected':''}" data-area-id="${a.id}"><span class="color-dot" style="background:${a.color}"></span>${escapeHtml(a.name)}</span>`).join("") || '<span style="color:var(--text-tertiary);font-size:12px;">No areas yet</span>'}
         </div>
 
         <label>Pomodoro study timer</label>
