@@ -3067,16 +3067,6 @@ function renderDetailPanel(){
   const ctxEl = document.getElementById("detailContext");
   ctxEl.addEventListener("change", ()=>{ updateTask(t.id, {context: ctxEl.value || null}); renderSidebarAndList(); });
 
-  document.querySelectorAll("#detailLabels .label-toggle").forEach(chip=>{
-    chip.addEventListener("click", ()=>{
-      const lid = chip.dataset.labelId;
-      const cur = new Set(t.labelIds||[]);
-      if(cur.has(lid)) cur.delete(lid); else cur.add(lid);
-      updateTask(t.id, {labelIds:[...cur]});
-      renderDetailPanel();
-      renderSidebarAndList();
-    });
-  });
   document.querySelectorAll("#detailAreas .label-toggle").forEach(chip=>{
     chip.addEventListener("click", ()=>{
       const aid = chip.dataset.areaId;
@@ -3087,7 +3077,17 @@ function renderDetailPanel(){
       renderSidebarAndList();
     });
   });
-
+  document.querySelectorAll("#detailLabels .label-toggle").forEach(chip=>{
+    chip.addEventListener("click", ()=>{
+      const lid = chip.dataset.labelId;
+      const cur = new Set(t.labelIds||[]);
+      if(cur.has(lid)) cur.delete(lid); else cur.add(lid);
+      updateTask(t.id, {labelIds:[...cur]});
+      renderDetailPanel();
+      renderSidebarAndList();
+    });
+  });
+  
   // Pomodoro controls
   const minutesInput = document.getElementById("pomodoroMinutesInput");
   if(minutesInput){
