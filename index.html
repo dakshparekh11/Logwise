@@ -494,14 +494,59 @@
   .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);}
 
   @media (max-width: 760px){
-    .sidebar{position:fixed;left:0;top:0;bottom:0;z-index:40;transform:translateX(-100%);transition:transform .2s;}
+    body{ font-size:15.5px; }
+    .sidebar{position:fixed;left:0;top:0;bottom:0;z-index:40;transform:translateX(-100%);transition:transform .2s;width:82vw;max-width:300px;min-width:0;box-shadow:6px 0 24px rgba(0,0,0,0.18);}
     .sidebar.open{transform:translateX(0);}
-    .main-inner{padding:20px 16px 100px 16px;}
-    .mobile-menu-btn{display:flex !important;}
+    .main-inner{padding:18px 16px 110px 16px;}
+    .mobile-menu-btn{display:flex !important;font-size:20px;}
     .detail-panel{width:100vw;}
     .dash-grid{grid-template-columns:1fr;}
+
+    /* Larger, more comfortable touch targets and text on phones */
+    .nav-item{font-size:16px;padding:11px 12px;gap:12px;}
+    .nav-item .nav-icon{width:22px;height:22px;font-size:17px;}
+    .nav-item .count{font-size:13px;}
+    .sidebar-title{font-size:17px;}
+    .add-task-btn{font-size:15.5px;padding:10px 12px;}
+    .sidebar-section-header{font-size:13px;padding:8px 10px 6px 10px;}
+    .project-item, .label-item, .area-item{font-size:15px;padding:9px 10px;}
+    .search-box{padding:10px 12px;}
+    .search-box input{font-size:16px;} /* 16px prevents iOS Safari auto-zoom on focus */
+
+    .view-title{font-size:22px;}
+    .view-subtitle{font-size:13.5px;}
+    .task-title{font-size:16px;line-height:1.45;}
+    .task-row{padding-top:10px;padding-bottom:10px;}
+    .due-badge, .task-project-tag, .subtask-count, .time-chip{font-size:12.5px;}
+    .area-chip, .context-chip, .srs-chip{font-size:12px;padding:3px 8px;}
+
+    .btn{font-size:14.5px;padding:9px 14px;min-height:40px;}
+    .btn-sm{font-size:13px;padding:7px 12px;min-height:34px;}
+    .checkbox{width:22px;height:22px;}
+    .habit-check{width:26px;height:26px;}
+
+    /* Prevent iOS auto-zoom on any text input / textarea / select */
+    input[type=text], input[type=email], input[type=password], input[type=date],
+    input[type=time], input[type=number], textarea, select{ font-size:16px; }
+
+    .quick-add-row{font-size:15px;padding:10px 8px;}
+    .journal-textarea{font-size:15.5px;}
+    .modal{width:92vw;max-width:420px;}
+    .modal input, .modal textarea{font-size:16px;}
+    .cmdk-box{width:92vw;}
+  }
+  @media (max-width: 400px){
+    .view-title{font-size:19px;}
+    .sidebar{width:86vw;}
   }
   .mobile-menu-btn{display:none;align-items:center;justify-content:center;border:none;background:transparent;cursor:pointer;padding:8px;margin-right:6px;}
+  #sidebarBackdrop{display:none;}
+  @media (max-width: 760px){
+    #sidebarBackdrop.open{
+      display:block;position:fixed;inset:0;z-index:35;
+      background:rgba(0,0,0,0.35);
+    }
+  }
 
   /* Theme toggle */
   .theme-toggle-btn{border:none;background:transparent;cursor:pointer;font-size:15px;padding:4px 6px;border-radius:6px;margin-left:auto;color:var(--text-secondary);}
@@ -748,6 +793,7 @@
       </div>
     </div>
   </nav>
+  <div id="sidebarBackdrop"></div>
 
   <!-- MAIN -->
   <main class="main">
@@ -3521,6 +3567,7 @@ function wireStaticEvents(){
         renderAll();
       });
       document.getElementById("sidebar").classList.remove("open");
+      document.getElementById("sidebarBackdrop").classList.remove("open");
     });
   });
 
@@ -3529,6 +3576,7 @@ function wireStaticEvents(){
     if(skip.includes(state.ui.view)) state.ui.view = "inbox";
     renderAll();
     openQuickAddForm();
+    closeMobileSidebar();
   });
 
   document.getElementById("addProjectBtn").addEventListener("click", ()=> openProjectModal(null));
@@ -3548,7 +3596,9 @@ function wireStaticEvents(){
 
   document.getElementById("mobileMenuBtn").addEventListener("click", ()=>{
     document.getElementById("sidebar").classList.toggle("open");
+    document.getElementById("sidebarBackdrop").classList.toggle("open");
   });
+  document.getElementById("sidebarBackdrop").addEventListener("click", closeMobileSidebar);
 
   document.getElementById("exportBackupBtn").addEventListener("click", exportBackup);
   const importInput = document.getElementById("importFileInput");
@@ -3593,6 +3643,7 @@ function wireDynamicEvents(){
       closeTaskDetail();
       resetKeyboardFocus();
       renderAll();
+      closeMobileSidebar();
     });
   });
   document.querySelectorAll('[data-action="fav-project"]').forEach(btn=>{
@@ -3613,6 +3664,7 @@ function wireDynamicEvents(){
       closeTaskDetail();
       resetKeyboardFocus();
       renderAll();
+      closeMobileSidebar();
     });
   });
   document.querySelectorAll('[data-action="edit-label"]').forEach(btn=>{
@@ -3630,6 +3682,7 @@ function wireDynamicEvents(){
       closeTaskDetail();
       resetKeyboardFocus();
       renderAll();
+      closeMobileSidebar();
     });
   });
   document.querySelectorAll('[data-action="edit-area"]').forEach(btn=>{
@@ -3851,6 +3904,12 @@ function renderAll(){
   renderTaskListArea();
   wireDynamicEvents();
   renderDetailPanel();
+}
+function closeMobileSidebar(){
+  const sb = document.getElementById("sidebar");
+  const bd = document.getElementById("sidebarBackdrop");
+  if(sb) sb.classList.remove("open");
+  if(bd) bd.classList.remove("open");
 }
 function switchViewWithFade(applyFn){
   const el = document.querySelector(".main-inner");
