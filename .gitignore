@@ -1,0 +1,36 @@
+# ================================================================
+# MEMORA — .gitignore
+# ================================================================
+
+# CRITICAL: Firebase config with real API keys — NEVER commit this
+config.js
+
+# Firebase CLI artifacts
+.firebase/
+.firebaserc
+
+# Dependencies (if added later)
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
+*.DS_Store
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Env / secrets
+.env
+.env.local
+.env.*.local
+*.secret
+
+# Build output (if added later)
+dist/
+build/
+out/
