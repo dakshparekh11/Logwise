@@ -1,17 +1,9 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Each authenticated user can only read/write their own document.
-    // No other user — or unauthenticated caller — can touch it.
-    match /memora_users/{userId} {
-      allow read, write: if request.auth != null
-                         && request.auth.uid == userId;
-    }
-
-    // Deny everything else by default
-    match /{document=**} {
-      allow read, write: if false;
+    match /logwise_users/{userId} {
+      // Only the signed-in user can read or write their own document.
+      allow read, write: if request.auth != null && request.auth.uid == userId;
     }
   }
 }

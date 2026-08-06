@@ -1,27 +1,13 @@
 {
-  "name": "Memora",
-  "short_name": "Memora",
-  "description": "Personal active recall engine with spaced repetition",
-  "start_url": ".",
-  "scope": ".",
+  "name": "Logwise",
+  "short_name": "Logwise",
+  "description": "Personal study planner: tasks, habits, journal, syllabus and exam tracking.",
+  "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#F8FAFC",
-  "theme_color": "#2563EB",
-  "orientation": "portrait-primary",
+  "background_color": "#fafafa",
+  "theme_color": "#db4c3f",
   "icons": [
-    {
-      "src": "icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
-    }
-  ],
-  "categories": ["education", "productivity"],
-  "lang": "en-US"
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
 }
