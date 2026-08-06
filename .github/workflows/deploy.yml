@@ -1,0 +1,68 @@
+name: Deploy Logwise to GitHub Pages
+
+on:
+  push:
+    branches: [main]       # Auto-deploys on every push to main
+  workflow_dispatch:        # Manual trigger from the Actions tab
+
+# Required permissions for GitHub Pages deployment
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Only one deployment at a time; don't cancel in-progress runs
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── CRITICAL STEP ──────────────────────────────────────────
+      # config.js is gitignored (never in the repo) so we generate
+      # it here from encrypted GitHub Secrets before uploading.
+      # Your real Firebase keys are never written into the codebase.
+      # ───────────────────────────────────────────────────────────
+      - name: Generate config.js from GitHub Secrets
+        run: |
+          cat > config.js << 'CONFIGEOF'
+          window.LOGWISE_CONFIG = {
+            apiKey:            "${{ secrets.FIREBASE_API_KEY }}",
+            authDomain:        "${{ secrets.FIREBASE_AUTH_DOMAIN }}",
+            projectId:         "${{ secrets.FIREBASE_PROJECT_ID }}",
+            storageBucket:     "${{ secrets.FIREBASE_STORAGE_BUCKET }}",
+            messagingSenderId: "${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}",
+            appId:             "${{ secrets.FIREBASE_APP_ID }}"
+          };
+          CONFIGEOF
+
+      - name: Verify config.js was generated
+        run: |
+          if [ ! -f config.js ]; then
+            echo "ERROR: config.js was not generated. Check your GitHub Secrets."
+            exit 1
+          fi
+          echo "config.js generated successfully."
+
+      - name: Setup GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload files to Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          # Upload the entire project folder
+          path: '.'
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
